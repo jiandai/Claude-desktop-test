@@ -176,31 +176,95 @@ cat(sprintf("Validation set: %d samples (%.1f%%)\n", nrow(val_set), 100 * nrow(v
 cat(sprintf("Test set:       %d samples (%.1f%%)\n", nrow(test_set), 100 * nrow(test_set) / nrow(df)))
 
 # ==============================================================================
-# Section 5: Preprocessing (Center + Scale)
+# Section 5: Feature Engineering & Preprocessing
 # ==============================================================================
 
-cat("\n=== PREPROCESSING ===\n")
+cat("\n=== FEATURE ENGINEERING & PREPROCESSING ===\n")
 
 # Separate features and target
 feature_cols <- setdiff(names(df), "quality")
 
+# --- 5a: Outlier Detection & Capping (IQR-based Winsorizing) ---
+cat("Detecting and capping outliers using IQR method (winsorizing)...\n")
+
+# Compute bounds from training data only (3 * IQR rule)
+IQR_MULTIPLIER <- 3.0
+outlier_bounds <- lapply(feature_cols, function(col) {
+  x <- train_set[[col]]
+  q1 <- quantile(x, 0.25)
+  q3 <- quantile(x, 0.75)
+  iqr <- q3 - q1
+  list(lower = q1 - IQR_MULTIPLIER * iqr, upper = q3 + IQR_MULTIPLIER * iqr)
+})
+names(outlier_bounds) <- feature_cols
+
+cap_outliers <- function(df_subset) {
+  for (col in feature_cols) {
+    df_subset[[col]] <- pmax(pmin(df_subset[[col]],
+                                  outlier_bounds[[col]]$upper),
+                             outlier_bounds[[col]]$lower)
+  }
+  df_subset
+}
+
+train_set_capped <- cap_outliers(train_set)
+val_set_capped   <- cap_outliers(val_set)
+test_set_capped  <- cap_outliers(test_set)
+
+total_capped <- sum(sapply(feature_cols, function(col) {
+  sum(train_set[[col]] != train_set_capped[[col]])
+}))
+cat(sprintf("  Capped %d outlier values in training set (3 * IQR threshold).\n", total_capped))
+
+# --- 5b: Polynomial & Interaction Feature Engineering ---
+cat("Adding polynomial and interaction features...\n")
+
+# Squared terms for physicochemical properties most correlated with quality
+poly_features <- c("alcohol", "volatile.acidity", "density",
+                   "residual.sugar", "free.sulfur.dioxide")
+
+add_engineered_features <- function(df_subset) {
+  # Squared (polynomial degree-2) terms
+  for (f in poly_features) {
+    df_subset[[paste0(f, "_sq")]] <- df_subset[[f]]^2
+  }
+  # Interaction terms between key feature pairs
+  df_subset$alcohol_x_volatile.acidity <- df_subset$alcohol * df_subset$volatile.acidity
+  df_subset$alcohol_x_density          <- df_subset$alcohol * df_subset$density
+  df_subset$density_x_residual.sugar   <- df_subset$density * df_subset$residual.sugar
+  df_subset
+}
+
+train_set_eng <- add_engineered_features(train_set_capped)
+val_set_eng   <- add_engineered_features(val_set_capped)
+test_set_eng  <- add_engineered_features(test_set_capped)
+
+all_feature_cols <- setdiff(names(train_set_eng), "quality")
+n_interaction_features <- length(all_feature_cols) - length(feature_cols) - length(poly_features)
+cat(sprintf("  Features: %d original -> %d after engineering (%d poly + %d interaction)\n",
+            length(feature_cols), length(all_feature_cols),
+            length(poly_features), n_interaction_features))
+
+# --- 5c: Center + Scale ---
+cat("Fitting center/scale preprocessor on training data...\n")
+
 # Fit preprocessing on training data only
-preproc <- preProcess(train_set[, feature_cols], method = c("center", "scale"))
+preproc <- preProcess(train_set_eng[, all_feature_cols], method = c("center", "scale"))
 
-train_x <- predict(preproc, train_set[, feature_cols])
-train_y <- train_set$quality
+train_x <- predict(preproc, train_set_eng[, all_feature_cols])
+train_y <- train_set_eng$quality
 
-val_x <- predict(preproc, val_set[, feature_cols])
-val_y <- val_set$quality
+val_x <- predict(preproc, val_set_eng[, all_feature_cols])
+val_y <- val_set_eng$quality
 
-test_x <- predict(preproc, test_set[, feature_cols])
-test_y <- test_set$quality
+test_x <- predict(preproc, test_set_eng[, all_feature_cols])
+test_y <- test_set_eng$quality
 
-cat("Preprocessing fitted on training data and applied to all sets.\n")
+cat("Preprocessing complete.\n")
 
 # Recombine for caret::train
 train_data <- cbind(train_x, quality = train_y)
-val_data <- cbind(val_x, quality = val_y)
+val_data   <- cbind(val_x, quality = val_y)
 
 # ==============================================================================
 # Section 6: Model Training & Hyperparameter Tuning
@@ -225,7 +289,7 @@ calc_metrics <- function(actual, predicted) {
 cat("--- Training Random Forest ---\n")
 
 rf_grid <- expand.grid(
-  mtry = c(2, 4, 6, 8, 11),
+  mtry = c(2, 4, 6, 8, 11, 14, 19),  # 19 = total feature count after engineering
   splitrule = c("variance", "extratrees"),
   min.node.size = c(3, 5, 10)
 )
