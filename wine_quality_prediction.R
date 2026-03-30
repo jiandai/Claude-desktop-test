@@ -51,12 +51,38 @@ dir.create("plots", showWarnings = FALSE)
 dir.create("results", showWarnings = FALSE)
 
 # Download white wine quality dataset
-data_url <- "https://raw.githubusercontent.com/shrikant-temburwar/Wine-Quality-Dataset/master/winequality-white.csv"
+data_urls <- c(
+  "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv",
+  "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv?download=1",
+  "https://raw.githubusercontent.com/shrikant-temburwar/Wine-Quality-Dataset/master/winequality-white.csv"
+)
 data_file <- "data/winequality-white.csv"
 
 if (!file.exists(data_file)) {
-  cat("Downloading white wine quality dataset...\n")
-  download.file(data_url, data_file, method = "auto", quiet = FALSE)
+  cat("White wine quality dataset not found locally. Attempting to download...\n")
+  data_downloaded <- FALSE
+  for (url in data_urls) {
+    tryCatch({
+      download.file(url, data_file, method = "auto", quiet = FALSE)
+      if (file.exists(data_file) && file.size(data_file) > 1000) {
+        cat("Dataset downloaded successfully from:", url, "\n")
+        data_downloaded <- TRUE
+        break
+      } else {
+        file.remove(data_file)
+      }
+    }, error = function(e) {
+      cat("  Could not download dataset from:", url, "\n")
+    })
+  }
+  if (!data_downloaded) {
+    stop(
+      "Failed to download the white wine quality dataset.\n",
+      "Please download it manually from one of the following URLs:\n  ",
+      paste(data_urls, collapse = "\n  "),
+      "\n and save it as '", data_file, "'."
+    )
+  }
 }
 
 # Research paper information (no automatic PDF download to avoid licensing issues)
