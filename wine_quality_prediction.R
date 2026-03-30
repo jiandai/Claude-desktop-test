@@ -59,37 +59,17 @@ if (!file.exists(data_file)) {
   download.file(data_url, data_file, method = "auto", quiet = FALSE)
 }
 
-# Attempt to download the research paper
+# Research paper information (no automatic PDF download to avoid licensing issues)
 paper_file <- "data/cortez2009_wine_quality.pdf"
 if (!file.exists(paper_file)) {
-  cat("Attempting to download the research paper...\n")
-  paper_urls <- c(
-    "https://repositorium.sdum.uminho.pt/bitstream/1822/10029/1/wine5.pdf",
-    "https://www.sciencedirect.com/science/article/pii/S0167923609001377/pdfft"
-  )
-  paper_downloaded <- FALSE
-  for (url in paper_urls) {
-    tryCatch({
-      download.file(url, paper_file, method = "auto", quiet = TRUE)
-      if (file.exists(paper_file) && file.size(paper_file) > 1000) {
-        cat("Paper downloaded successfully.\n")
-        paper_downloaded <- TRUE
-        break
-      } else {
-        file.remove(paper_file)
-      }
-    }, error = function(e) {
-      cat("  Could not download from:", url, "\n")
-    })
-  }
-  if (!paper_downloaded) {
-    cat("\nPaper could not be downloaded automatically.\n")
-    cat("Please access it manually:\n")
-    cat("  Title: Modeling wine preferences by data mining from physicochemical properties\n")
-    cat("  Authors: P. Cortez, A. Cerdeira, F. Almeida, T. Matos, J. Reis\n")
-    cat("  Journal: Decision Support Systems, 47(4), 547-553, 2009\n")
-    cat("  DOI: https://doi.org/10.1016/j.dss.2009.05.016\n\n")
-  }
+  cat("\nThe research paper associated with this dataset is not downloaded automatically.\n")
+  cat("Please access it manually using the citation and DOI below:\n\n")
+  cat("  Title: Modeling wine preferences by data mining from physicochemical properties\n")
+  cat("  Authors: P. Cortez, A. Cerdeira, F. Almeida, T. Matos, J. Reis\n")
+  cat("  Journal: Decision Support Systems, 47(4), 547-553, 2009\n")
+  cat("  DOI: https://doi.org/10.1016/j.dss.2009.05.016\n\n")
+  cat("You may also try the following URL in your browser (if accessible and permitted):\n")
+  cat("  https://repositorium.sdum.uminho.pt/bitstream/1822/10029/1/wine5.pdf\n\n")
 }
 
 # ==============================================================================
