@@ -18,10 +18,18 @@
 required_packages <- c("caret", "ranger", "gbm", "glmnet",
                        "corrplot", "ggplot2", "reshape2")
 
-for (pkg in required_packages) {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    install.packages(pkg, repos = "https://cloud.r-project.org", quiet = TRUE)
-  }
+missing_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
+if (length(missing_packages) > 0) {
+  stop(
+    paste0(
+      "The following required R packages are not installed: ",
+      paste(missing_packages, collapse = ", "),
+      ".\nPlease install them before running this script, for example:\n",
+      "install.packages(c(\"",
+      paste(missing_packages, collapse = "\", \""), "\"))"
+    ),
+    call. = FALSE
+  )
 }
 
 library(caret)
